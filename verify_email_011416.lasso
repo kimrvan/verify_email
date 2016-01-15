@@ -126,7 +126,9 @@ debug('smtp_mailfrom: ' + #smtp_mailfrom)
 debug('smtp_rcptto: ' + #smtp_rcptto)
 /*
 	POSSIBLE RESPONSES
+	True:
 	- Server Error: 250 Requested mail action okay, completed
+	False:
 	- Server Error: 450 Requested mail action not taken: mailbox unavailable
 		"Greylisting will send back a temporary error (450) and therefore the address will be 
 		denied" - http://www.serversmtp.com/en/smtp-error
