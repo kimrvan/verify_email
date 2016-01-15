@@ -5,12 +5,17 @@
 
 	REQUIRES
 		email
-	RETURNS in an array
+
+	RETURNS following in an array
 		mailserver_msg
 		duration
 
 	USAGE
-		verify_email('someone@domain.com')
+		local(email = 'somebody@domain.com')
+	
+		local(result = verify_email(#email))
+		local(mailserver_msg = #result->first)
+		local(duration = #result->second)
 
 
 	RESEARCH
@@ -20,16 +25,16 @@
 	Log to console - sudo tcpdump -w /private/var/log/mail.log  -s 0 host mail.sutp.com and port 25
 	Checking to see if an Email address is real.. - http://www.lassotalk.com/Checking-to-see-if-an-Email-address-is-real.lasso?225884
 
-	Lasso
+	- Lasso
 	There's something funky with the SMTP tags - http://www.lassotalk.com/There-s-something-funky-with-the-SMTP-tags.lasso?273604
 	pop type for Lasso 9 - https://gist.github.com/Ke-/54b5ba95b9490070e7a6
 	smtp-validate-email - https://github.com/zytzagoo/smtp-validate-email/blob/master/smtp-validate-email.php
 	SSL and SMTP - http://www.lassotalk.com/SSL-and-SMTP.lasso?235664
 
-	php
+	- php
 	php-smtp-email-validation - https://code.google.com/p/php-smtp-email-validation/source/browse/trunk/smtp_validateEmail.class.php
 
-	Java
+	- Java
 	Lookup using MX record to validate mail server - http://www.rgagnon.com/javadetails/java-0452.html
 	
 
@@ -43,43 +48,28 @@
 
 */
 
-/*
-// Load Ke Carlton's debug // Can activate 'console' mode, or use debug->activate for HTML mode
-( (client_ip == '127.0.0.1' && server_name >> 'sutp.dev') || (client_ip == '68.148.103.77' && server_name >> 'dev.sutp') ) ? debug->activate('console')
-*/
-
 define verify_email => type {
 	data
 		public email::string, // email address to verify
-		public mailserver_msg::string, // stores results of SMTP responses
-		public duration::date, // stores time to complete script
-		public result::array // used to return .mailserver_msg and duration
+		public mailserver_msg, // stores results of SMTP responses
+		public duration, // stores time to complete script
+		public result // used to return .mailserver_msg and duration
 
 	public onCreate(
 		email::string // required
 	) => {
-//	) => debug => {
 
 		// Assign parameter values to data members
-		.email = #email
+		.'email' = #email
 
 		// Var used to time duration of process
 		local(time_start = date)
 		
-		debug(`**** ` + #time_start + ` ********************`)
-		
-		// .email = 'disco@sutp.com' // test for bad email
-		// .email = 'kimrvan@gmail.com'
-// 		.email = 'taplin@accesstelluride.com'
-		// .email = 'fordprefect@sutp.com' // use on dev.sutp.com mail server
-		// .email = 'kimv@sutp.com'
-		// .email = 'kiwibirdie83@me.com'
-		// .email = 'johnb@me.com'
-		
-		debug('email to validate: ' + .email)
+		log_critical(`**** ` + #time_start + ` ********************`)		
+		log_critical('email to validate: ' + .'email')
 		
 		// Extract domain from email address
-		local(email_parts = .email->split('@'))
+		local(email_parts = .'email'->split('@'))
 		local(email_domain = #email_parts->second)
 		
 		// Determine mailserver host name
@@ -91,13 +81,13 @@ define verify_email => type {
 			local(mailserver_host = #mailserver_lookup->find('host'))
 			local(mailserver_priority = integer(#mailserver_lookup->find('priority'))) // lower is better
 			
-		debug('mailserver_domain: ' + #mailserver_domain) // ie. sutp.com OR gmail.com
-		debug('mailserver_host: ' + #mailserver_host) // ie. mail.sutp.com OR gmail-smtp-in.l.google.com
-		debug('mailserver_priority: ' + #mailserver_priority)
+// 		log_critical('mailserver_domain: ' + #mailserver_domain) // ie. gmail.com
+		log_critical('mailserver_host: ' + #mailserver_host) // ie. gmail-smtp-in.l.google.com
+		log_critical('mailserver_priority: ' + #mailserver_priority)
 		
 		else
 			.mailserver_msg = 'Mail server lookup failed'
-			debug('mailserver_msg: ' + .mailserver_msg)
+			log_critical('mailserver_msg: ' + .mailserver_msg)
 		}
 		
 		// Initiate var to store SMTP commands to send
@@ -111,7 +101,7 @@ define verify_email => type {
 			-host = #mailserver_host,
 			-port = 25)) // unsecure, does not use TLS/SSL
 		
-		debug('smtp_open: ' + #smtp_open)
+		log_critical('smtp_open: ' + #smtp_open)
 		
 		if(#smtp_open) => {^
 			
@@ -120,19 +110,19 @@ define verify_email => type {
 				-expect = 250, // expected result code
 				-read = true))
 		
-		debug('smtp_mailfrom: ' + #smtp_mailfrom)
+		log_critical('smtp_mailfrom: ' + #smtp_mailfrom)
 		
 			if(#smtp_mailfrom) => {
 					
 				// Identify message recipient
-				#command_send = 'RCPT TO:<' + .email + '>\r\n'
+				#command_send = 'RCPT TO:<' + .'email' + '>\r\n'
 		
 				local(smtp_rcptto = #smtp->command(
 					-send = #command_send,
 					-expect = 250, // expected result code
 					-read = true))
 		
-				debug('smtp_rcptto: ' + #smtp_rcptto)
+				log_critical('smtp_rcptto: ' + #smtp_rcptto)
 				/*
 					POSSIBLE RESPONSES
 					True:
@@ -162,10 +152,9 @@ define verify_email => type {
 		// Close mail server connection
 		local(smtp_close = #smtp->close)
 		
-		debug('smtp_close: ' + #smtp_close)
+		log_critical('smtp_close: ' + #smtp_close)
 
 		.duration = duration(#time_start,date)
-		
 		.result = array(.mailserver_msg,.duration)
 		
 		return(.result)
