@@ -136,9 +136,9 @@ debug('smtp_rcptto: ' + #smtp_rcptto)
  */
 
 		if(#smtp_rcptto) => {
-			#mailserver_msg = 'Recipient accepted - Email address is valid'
+			#mailserver_msg = 'Recipient accepted - Email address is verified'
 		else // #smtp_rcptto is false - close connection and try again to accomodate greylisting
-			#mailserver_msg = 'Recipient NOT accepted - Email address is NOT valid'
+			#mailserver_msg = 'Recipient NOT accepted - Email address can not be verified'
 		}
 
 	else // #smtp_mailfrom is false
