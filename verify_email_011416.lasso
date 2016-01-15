@@ -125,10 +125,14 @@ debug('smtp_mailfrom: ' + #smtp_mailfrom)
 
 debug('smtp_rcptto: ' + #smtp_rcptto)
 /*
-	Server Error: 450 Requested mail action not taken: mailbox unavailable
-	- http://www.serversmtp.com/en/smtp-error
-	Greylisting will send back a temporary error (450) and therefore the address will be 
-denied.
+	POSSIBLE RESPONSES
+	- Server Error: 250 Requested mail action okay, completed
+	- Server Error: 450 Requested mail action not taken: mailbox unavailable
+		"Greylisting will send back a temporary error (450) and therefore the address will be 
+		denied" - http://www.serversmtp.com/en/smtp-error
+	- Server Error: 550 Requested action not taken: mailbox unavailable
+		Blacklisting by spam checker (ie. Spamhaus Project - http://www.spamhaus.org/) or 
+		rejection by mail server to prevent spam
  */
 
 		if(#smtp_rcptto) => {
