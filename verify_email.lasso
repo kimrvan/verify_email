@@ -12,11 +12,17 @@
 		proc_duration
 
 	USAGE
+		// Submit an email address for processing
 		local(email = 'somebody@domain.com')
-	
 		local(result = verify_email(#email))
+
 		local(proc_success = #result->first)
 		local(proc_msg = #result->second)
+		// If #proc_success if false, use #proc_msg to determine point of failure
+		// 	001 - Mail server lookup failed - Could be due to bad domain
+		// 	002 - Connection rejected - Could be due to Blacklisting
+		// 	003 - Sender email rejected
+		// 	004 - Recipient email rejected - Could be due to Greylisting
 		local(proc_duration = #result->get(3))
 
 
@@ -80,7 +86,8 @@ define verify_email => type {
 		// Determine mailserver host name
 		local(mailserver_lookup = email_mxlookup(#email_domain))
 		
-		if(#mailserver_lookup !== void) => {
+		if(#mailserver_lookup !== void && #mailserver_lookup->size > 0) => {
+
 			// Define vars for server response
 			local(mailserver_domain = #mailserver_lookup->find('domain'))
 			local(mailserver_host = #mailserver_lookup->find('host'))
@@ -89,80 +96,77 @@ define verify_email => type {
 // 			log_critical('mailserver_domain: ' + #mailserver_domain) // ie. gmail.com
 			log_critical('mailserver_host: ' + #mailserver_host) // ie. gmail-smtp-in.l.google.com
 			log_critical('mailserver_priority: ' + #mailserver_priority)
-		else
-			.proc_msg = 'Mail server lookup failed'
-			log_critical('MX Lookup: ' + .proc_msg)
-		}
 		
-		// Initiate var to store SMTP commands to send
-		local(command_send = string)
-		
-		// Create an instance of 'email_smtp' object
-		local(smtp = email_smtp)
-		
-		// Open mail server connection
-		local(smtp_open = #smtp->open(
-			-host = #mailserver_host,
-			-port = 25)) // unsecure, does not use TLS/SSL
-		
-		log_critical('smtp_open: ' + #smtp_open)
-		
-		if(#smtp_open) => {^
+			// Initiate var to store SMTP commands to send
+			local(command_send = string)
 			
-			local(smtp_mailfrom = #smtp->command(
-				-send = 'MAIL FROM:<automatedemail@sutp.com>\r\n', // Identify sender of message
-				-expect = 250, // expected result code
-				-read = true))
-		
-		log_critical('smtp_mailfrom: ' + #smtp_mailfrom)
-		
-			if(#smtp_mailfrom) => {
-					
-				// Identify message recipient
-				#command_send = 'RCPT TO:<' + .'email' + '>\r\n'
-		
-				local(smtp_rcptto = #smtp->command(
-					-send = #command_send,
+			// Create an instance of 'email_smtp' object
+			local(smtp = email_smtp)
+			
+			// Open mail server connection
+			local(smtp_open = #smtp->open(
+				-host = #mailserver_host,
+				-port = 25)) // unsecure, does not use TLS/SSL
+			
+			log_critical('smtp_open: ' + #smtp_open)
+			
+			if(#smtp_open) => {^
+				
+				local(smtp_mailfrom = #smtp->command(
+					-send = 'MAIL FROM:<automatedemail@sutp.com>\r\n', // Identify sender of message
 					-expect = 250, // expected result code
 					-read = true))
-		
-				log_critical('smtp_rcptto: ' + #smtp_rcptto)
-				/*
-					POSSIBLE RESPONSES
-					True:
-					- Server Error: 250 Requested mail action okay, completed
-					False:
-					- Server Error: 450 Requested mail action not taken: mailbox unavailable
-						"Greylisting will send back a temporary error (450) and therefore the address will be 
-						denied" - http://www.serversmtp.com/en/smtp-error
-					- Server Error: 550 Requested action not taken: mailbox unavailable
-						Blacklisting by spam checker (ie. Spamhaus Project - http://www.spamhaus.org/) or 
-						rejection by mail server to prevent spam
-				 */
-		
-				if(#smtp_rcptto) => {
-					.proc_success = true
-					.proc_msg = 'Recipient accepted - Email address is verified'
-				else
-					.proc_msg = 'Recipient NOT accepted - Email address can NOT be verified'
+			
+				log_critical('smtp_mailfrom: ' + #smtp_mailfrom)
+			
+				if(#smtp_mailfrom) => {
+						
+					// Identify message recipient
+					#command_send = 'RCPT TO:<' + .'email' + '>\r\n'
+			
+					local(smtp_rcptto = #smtp->command(
+						-send = #command_send,
+						-expect = 250, // expected result code
+						-read = true))
+			
+					log_critical('smtp_rcptto: ' + #smtp_rcptto)
+					/*
+						POSSIBLE RESPONSES
+						True:
+						- Server Error: 250 Requested mail action okay, completed
+						False:
+						- Server Error: 450 Requested mail action not taken: mailbox unavailable
+							"Greylisting will send back a temporary error (450) and therefore the address will be 
+							denied" - http://www.serversmtp.com/en/smtp-error
+						- Server Error: 550 Requested action not taken: mailbox unavailable
+							Blacklisting by spam checker (ie. Spamhaus Project - http://www.spamhaus.org/) or 
+							rejection by mail server to prevent spam
+					 */
+			
+					if(#smtp_rcptto) => {
+						.proc_success = true
+					else
+						.proc_msg = '004 - Recipient email rejected'
+					}
+			
+				else // #smtp_mailfrom is false
+					.proc_msg = '003 - Sender email rejected' // result may be due to Greylisting
 				}
 		
-			else // #smtp_mailfrom is false
-				.proc_success = true // Return true to accomodate Greylisting
-				.proc_msg = 'Sender rejected'
-			}
-			
-		else
-			// #smtp_open is false
-			.proc_msg = 'Connection rejected - Invalid header'
-		^}
-		
-		// Close mail server connection
-		local(smtp_close = #smtp->close)
-		
-		log_critical('smtp_close: ' + #smtp_close)
+				// Close mail server connection
+				local(smtp_close = #smtp->close)
+				log_critical('smtp_close: ' + #smtp_close)
+				
+			else // #smtp_open is false - invalid header
+				.proc_msg = '002 - Connection rejected'
+			^}
 
-		.proc_duration = duration(#time_start,date)
+		else
+			.proc_msg = '001 - Mail server lookup failed'
+			log_critical('mailserver_lookup: ' + .proc_msg)
+		}
+
+		.proc_duration = #time_start->difference(date(), -millisecond)
 		.result = array(.proc_success,.proc_msg,.proc_duration)
 		
 		return(.result)
