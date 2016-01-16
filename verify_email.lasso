@@ -18,12 +18,12 @@
 
 		local(proc_success = #result->first)
 		local(proc_msg = #result->second)
-		// If #proc_success if false, use #proc_msg to determine point of failure
-		// 	001 - Mail server lookup failed - Could be due to bad domain
-		// 	002 - Connection rejected - Could be due to Blacklisting
-		// 	003 - Sender email rejected
-		// 	004 - Recipient email rejected - Could be due to Greylisting
-		local(proc_duration = #result->get(3))
+			// If #proc_success if false, use #proc_msg to determine point of failure
+			// 	'001 - Mail server lookup failed' - Could be due to bad domain
+			// 	'002 - Connection rejected' - Could be due to Blacklisting
+			// 	'003 - Sender email rejected'
+			// 	'004 - Recipient email rejected' - Could be due to Greylisting
+		local(proc_duration = #result->get(3)) // Returns milliseconds
 
 
 	RESEARCH
