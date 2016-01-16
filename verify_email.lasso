@@ -146,11 +146,11 @@ define verify_email => type {
 					if(#smtp_rcptto) => {
 						.proc_success = true
 					else
-						.proc_msg = '004 - Recipient email rejected'
+						.proc_msg = '004 - Recipient email rejected' // May be result of Greylisting
 					}
 			
 				else // #smtp_mailfrom is false
-					.proc_msg = '003 - Sender email rejected' // result may be due to Greylisting
+					.proc_msg = '003 - Sender email rejected'
 				}
 		
 				// Close mail server connection
