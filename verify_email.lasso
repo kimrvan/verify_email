@@ -148,6 +148,7 @@ define verify_email => type {
 				}
 		
 			else // #smtp_mailfrom is false
+				.proc_success = true // Return true to accomodate Greylisting
 				.proc_msg = 'Sender rejected'
 			}
 			
