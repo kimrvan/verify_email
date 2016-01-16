@@ -7,15 +7,17 @@
 		email
 
 	RETURNS following in an array
-		mailserver_msg
-		duration
+		proc_success
+		proc_msg
+		proc_duration
 
 	USAGE
 		local(email = 'somebody@domain.com')
 	
 		local(result = verify_email(#email))
-		local(mailserver_msg = #result->first)
-		local(duration = #result->second)
+		local(proc_success = #result->first)
+		local(proc_msg = #result->second)
+		local(proc_duration = #result->get(3))
 
 
 	RESEARCH
@@ -51,15 +53,18 @@
 define verify_email => type {
 	data
 		public email::string, // email address to verify
-		public mailserver_msg, // stores results of SMTP responses
-		public duration, // stores time to complete script
-		public result // used to return .mailserver_msg and duration
+		public proc_success, // used to return true or false
+		public proc_msg, // stores results of SMTP responses
+		public proc_duration, // stores time to complete script
+		public result // used to return .proc_success, .proc_msg and .proc_duration
 
 	public onCreate(
 		email::string // required
 	) => {
 
-		// Assign parameter values to data members
+		.proc_success = false
+
+		// Assign parameter value to data member
 		.'email' = #email
 
 		// Var used to time duration of process
@@ -81,13 +86,12 @@ define verify_email => type {
 			local(mailserver_host = #mailserver_lookup->find('host'))
 			local(mailserver_priority = integer(#mailserver_lookup->find('priority'))) // lower is better
 			
-// 		log_critical('mailserver_domain: ' + #mailserver_domain) // ie. gmail.com
-		log_critical('mailserver_host: ' + #mailserver_host) // ie. gmail-smtp-in.l.google.com
-		log_critical('mailserver_priority: ' + #mailserver_priority)
-		
+// 			log_critical('mailserver_domain: ' + #mailserver_domain) // ie. gmail.com
+			log_critical('mailserver_host: ' + #mailserver_host) // ie. gmail-smtp-in.l.google.com
+			log_critical('mailserver_priority: ' + #mailserver_priority)
 		else
-			.mailserver_msg = 'Mail server lookup failed'
-			log_critical('mailserver_msg: ' + .mailserver_msg)
+			.proc_msg = 'Mail server lookup failed'
+			log_critical('MX Lookup: ' + .proc_msg)
 		}
 		
 		// Initiate var to store SMTP commands to send
@@ -136,17 +140,20 @@ define verify_email => type {
 						rejection by mail server to prevent spam
 				 */
 		
-				#smtp_rcptto
-					? .mailserver_msg = 'Recipient accepted - Email address is verified'
-					| .mailserver_msg = 'Recipient NOT accepted - Email address can NOT be verified'
+				if(#smtp_rcptto) => {
+					.proc_success = true
+					.proc_msg = 'Recipient accepted - Email address is verified'
+				else
+					.proc_msg = 'Recipient NOT accepted - Email address can NOT be verified'
+				}
 		
 			else // #smtp_mailfrom is false
-				.mailserver_msg = 'Sender rejected'
+				.proc_msg = 'Sender rejected'
 			}
 			
 		else
 			// #smtp_open is false
-			.mailserver_msg = 'Connection rejected - Invalid header'
+			.proc_msg = 'Connection rejected - Invalid header'
 		^}
 		
 		// Close mail server connection
@@ -154,8 +161,8 @@ define verify_email => type {
 		
 		log_critical('smtp_close: ' + #smtp_close)
 
-		.duration = duration(#time_start,date)
-		.result = array(.mailserver_msg,.duration)
+		.proc_duration = duration(#time_start,date)
+		.result = array(.proc_success,.proc_msg,.proc_duration)
 		
 		return(.result)
 	}
