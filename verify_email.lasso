@@ -4,18 +4,15 @@
 	Type to determine if a email address exists on a mail server
 
 	REQUIRES
-		email
+		'email' as string
 
-	RETURNS following in an array
-		proc_success
-		proc_msg
-		sys_msg
-		proc_duration
+	RETURNS
+		.result = array(.proc_success,.proc_msg,.user_msg,.proc_duration)
 
 	USAGE
 		// Submit an email address for processing
 		local(email = 'somebody@domain.com')
-		local(result = verify_email(#email))
+		local(result = verify_email(#email)) // as array
 
 		local(proc_success = #result->first)
 		local(proc_msg = #result->second)
@@ -24,7 +21,7 @@
 			// 	'002 - Connection rejected' - Could be due to Blacklisting
 			// 	'003 - Sender email rejected'
 			// 	'004 - Recipient email rejected' - Could be due to Greylisting
-		local(sys_msg = #result->get(3)) // Used to pass error message to end-user
+		local(user_msg = #result->get(3)) // Used to pass error message to end-user
 		local(proc_duration = #result->get(4)) // Returns milliseconds
 
 
@@ -64,7 +61,7 @@ define verify_email => type {
 		public proc_success, // used to return true or false
 		public proc_msg, // stores results of SMTP responses
 		public proc_duration, // stores time to complete script
-		public sys_msg, // used to pass error message to end-user
+		public user_msg, // used to pass error message to end-user
 		public result // used to return .proc_success, .proc_msg and .proc_duration
 
 	public onCreate(
@@ -173,7 +170,7 @@ define verify_email => type {
 							//	Blacklisting by spam checker (ie. Spamhaus Project - http://www.spamhaus.org/) or 
 							//	rejection by mail server to prevent spam
 							.proc_msg = '004 - Email Recipient rejected'
-							.sys_msg = 'Please re-enter your email address. The address you entered does NOT appear to be correct.'
+							.user_msg = 'Please re-enter your email address. The address you entered does NOT appear to be correct.'
 						}
 				
 					else // #smtp_mailfrom is false
@@ -195,12 +192,12 @@ define verify_email => type {
 				// Server Error: 554 Transaction failed // *** Unconfirmed that this error occurs when email_mxlookup fails ***
 				.proc_msg = '001 - Mail server lookup failed'
 				log_critical('mailserver_lookup: ' + .proc_msg)
-				.sys_msg = 'Please check your email address after the \'@\'. The domain you used does NOT appear to be correct.'
+				.user_msg = 'Please check your email address after the \'@\'. The domain you used does NOT appear to be correct.'
 			}
 		^}
 
 		.proc_duration = #time_start->difference(date(), -millisecond)
-		.result = array(.proc_success,.proc_msg,.sys_msg,.proc_duration)
+		.result = array(.proc_success,.proc_msg,.user_msg,.proc_duration)
 		
 		return(.result)
 	}
