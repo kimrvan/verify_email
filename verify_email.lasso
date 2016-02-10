@@ -59,10 +59,11 @@ define verify_email => type {
 	data
 		public email::string, // email address to verify
 		public proc_success, // used to return true or false
-		public proc_msg, // stores results of SMTP responses
+		public proc_msg::string = string, // stores results of SMTP responses
 		public proc_duration, // stores time to complete script
-		public user_msg, // used to pass error message to end-user
-		public result // used to return .proc_success, .proc_msg and .proc_duration
+		public user_msg::string = string, // used to pass message to end-user
+		public error_code::string = string, // used to pass error code
+		public error_msg::string = string // used to pass error message
 
 	public onCreate(
 		email::string // required
@@ -89,20 +90,30 @@ define verify_email => type {
 
 			handle => {^
 
-				if(error_code !== 0) && (error_code !== 250) => {
+/*
+				// An error preventing verification has occurred
+				if((error_code !== 0) && (error_code !== 250)) => {
 
 					// Send email with error
-					#email_body = 'Email verification for ' + .email + ' generated an error:\r\n\r\n' + 
+					#email_body = '\tOn ' + server_date + ' at ' + server_time + ' on server ' + server_name + ',\r\n' + 
+						'\temail verification for ' + .email + ' generated this error:\r\n\r\n' + 
 						'\t' + error_code + ' ' + error_msg + '\r\n\r\n' + 
-						'\t on ' + server_date + ' at ' + server_time + ' on ' + server_name + '.\r\n\r\n' + 
 						'NOTE: Server Error 450 may be an indication of Greylisting, and Server Error 550 may indicate Blacklisting by a spam checker.\r\n\r\n'
 
 					email_send(
+						-host = $emailhost,
+						-port = $emailport,
+						-username = $emailuser,
+						-password = $emailpwd,
+						-immediate = true,
 						-to = '"Kim Vandenbroek" <kim@pnww.ca>',
 						-from = '"SUTP Automated" <automatedemail@sutp.com>',
 						-subject = 'SUTP Website: Email Verification Error Logged',
 						-body = #email_body)
 				}
+*/
+				.error_code = error_code
+				.error_msg = error_msg
 
 				// Reset error_code to zero
 				error_reset
@@ -181,14 +192,17 @@ define verify_email => type {
 					local(smtp_close = #smtp->close)
 					log_critical('smtp_close: ' + #smtp_close)
 					
-				else // #smtp_open is false - invalid header, could not connect to server
+				else // #smtp_open is false - invalid header
+					// -8001 [Email_SMTP] Could not connect to server
 					// Server Error: 450 Requested mail action not taken: mailbox unavailable
 					// Server Error: 554 Transaction failed
 					.proc_msg = '002 - Connection rejected'
+					(error_code == -8001) 
+						? .user_msg = 'Please check your email address after the \'@\'. The domain you used does NOT appear to be correct.'
 				^}
 	
 			else
-				// [DNS_Response] -1 Found non-keyword parameter at a keyword-only position // *** Not sure if this 
+				// [DNS_Response] -1 Found non-keyword parameter at a keyword-only position // *** Not sure if this error is related to email_mxlookup ***
 				// Server Error: 554 Transaction failed // *** Unconfirmed that this error occurs when email_mxlookup fails ***
 				.proc_msg = '001 - Mail server lookup failed'
 				log_critical('mailserver_lookup: ' + .proc_msg)
@@ -197,9 +211,8 @@ define verify_email => type {
 		^}
 
 		.proc_duration = #time_start->difference(date(), -millisecond)
-		.result = array(.proc_success,.proc_msg,.user_msg,.proc_duration)
 		
-		return(.result)
+// 		return(.result)
 	}
 }
 
